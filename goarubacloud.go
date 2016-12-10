@@ -6,18 +6,36 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
+
+	"github.com/hashicorp/logutils"
 )
 
 const (
 	libraryVersion    = "0.1.0"
 	apiServerEnvName  = "ARUBACLOUD_APISERVER"
+	logLevelEnvName   = "ARUBACLOUD_LOGLEVEL"
 	apiServerBasePath = "/WsEndUser/v2.9/WsEndUser.svc/json"
 	userAgent         = "goarubacloud/" + libraryVersion
 	mediaType         = "application/json"
 )
+
+func init() {
+	logLevel := os.Getenv(logLevelEnvName)
+	if logLevel == "" {
+		logLevel = "INFO"
+	}
+
+	filter := &logutils.LevelFilter{
+		Levels:   []logutils.LogLevel{"DEBUG", "INFO"},
+		MinLevel: logutils.LogLevel(logLevel),
+		Writer:   os.Stderr,
+	}
+	log.SetOutput(filter)
+}
 
 // Client manages communication with Arubacloud API.
 type Client struct {
@@ -25,19 +43,19 @@ type Client struct {
 	client *http.Client
 
 	// Data center region
-	Datacenter         DataCenterRegion
+	Datacenter DataCenterRegion
 
 	// Base URL for API requests.
-	BaseURL            *url.URL
+	BaseURL *url.URL
 
 	// Control panel username
-	Username           string
+	Username string
 
 	// Control panel password
-	Password           string
+	Password string
 
 	// User agent for client
-	UserAgent          string
+	UserAgent string
 
 	// Services used for communicating with the API
 	DataCenters        DataCentersService
@@ -84,6 +102,8 @@ func NewClient(datacenter DataCenterRegion, username, password string) *Client {
 	apiServerBaseUrl := fmt.Sprintf("%s%s", apiServerHost, apiServerBasePath)
 	httpClient := http.DefaultClient
 	baseURL, _ := url.Parse(apiServerBaseUrl)
+
+	log.Printf("[DEBUG] Base URL: %s\n", baseURL)
 
 	client := &Client{client: httpClient,
 		BaseURL:   baseURL,
@@ -142,7 +162,7 @@ func (c *Client) NewRequest(action string, body interface{}) (*http.Request, err
 	}
 	bodyBuffer := bytes.NewBuffer(buffer)
 
-	//fmt.Printf("Request: %s\n", bodyBuffer.String())
+	log.Printf("[DEBUG] Request: %s\n", bodyBuffer.String())
 	req, err := http.NewRequest("POST", callUrl, bodyBuffer)
 	if err != nil {
 		return nil, err
@@ -191,7 +211,7 @@ func (c *Client) Do(req *http.Request, v interface{}) (*Response, error) {
 		return nil, err
 	}
 
-	//fmt.Printf("Response:\n%s\n\n", bytes.NewBuffer(data).String())
+	log.Printf("[DEBUG] Response:%s\n", bytes.NewBuffer(data).String())
 
 	err = CheckResponse(resp, data)
 	if err != nil {
