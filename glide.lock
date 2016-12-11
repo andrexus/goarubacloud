@@ -1,0 +1,6 @@
+hash: d8484102dd385fc885462a2efb58432da86955d88246e705fb42ef743c0b7684
+updated: 2016-12-11T15:47:17.540572373+01:00
+imports:
+- name: github.com/hashicorp/logutils
+  version: 0dc08b1671f34c4250ce212759ebd880f743d883
+testImports: []

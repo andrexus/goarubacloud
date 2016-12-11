@@ -17,7 +17,7 @@ import (
 const (
 	libraryVersion    = "0.1.0"
 	apiServerEnvName  = "ARUBACLOUD_APISERVER"
-	logLevelEnvName   = "ARUBACLOUD_LOGLEVEL"
+	logLevelEnvName   = "ARUBACLOUD_LOG"
 	apiServerBasePath = "/WsEndUser/v2.9/WsEndUser.svc/json"
 	userAgent         = "goarubacloud/" + libraryVersion
 	mediaType         = "application/json"

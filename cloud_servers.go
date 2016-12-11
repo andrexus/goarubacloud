@@ -201,9 +201,9 @@ type PublicIpAddress struct {
 type CloudServerCreateRequestPro struct {
 	Name                         string                         `json:"Name"`
 	AdministratorPassword        string                         `json:"AdministratorPassword"`
-	CPUQuantity                  int                            `json:"CPUQuantity"`
-	Note                         string                         `json:"Note"`
 	OSTemplateId                 int                            `json:"OSTemplateId"`
+	Note                         string                         `json:"Note"`
+	CPUQuantity                  int                            `json:"CPUQuantity"`
 	RAMQuantity                  int                            `json:"RAMQuantity"`
 	VirtualDisks                 []CloudServerCreateVirtualDisk `json:"VirtualDisks"`
 	NetworkAdaptersConfiguration []NetworkAdapter               `json:"NetworkAdaptersConfiguration"`
@@ -212,10 +212,10 @@ type CloudServerCreateRequestPro struct {
 // CloudServerCreateRequestSmart represents a request to create a CloudServer SMART.
 type CloudServerCreateRequestSmart struct {
 	Name                  string               `json:"Name"`
-	Note                  string               `json:"Note"`
-	OSTemplateId          int                  `json:"OSTemplateId"`
 	AdministratorPassword string               `json:"AdministratorPassword"`
+	OSTemplateId          int                  `json:"OSTemplateId"`
 	CloudServerSmartType  CloudServerSmartType `json:"SmartVMWarePackageID"`
+	Note                  string               `json:"Note"`
 }
 
 type hypervisorsRoot struct {
