@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	libraryVersion    = "0.1.0"
+	libraryVersion    = "0.2.0"
 	apiServerEnvName  = "ARUBACLOUD_APISERVER"
 	logLevelEnvName   = "ARUBACLOUD_LOG"
 	apiServerBasePath = "/WsEndUser/v2.9/WsEndUser.svc/json"
@@ -59,6 +59,7 @@ type Client struct {
 
 	// Services used for communicating with the API
 	DataCenters        DataCentersService
+	Hypervisors        HypervisorsService
 	CloudServers       CloudServersService
 	CloudServerActions CloudServerActionsService
 	ScheduledTasks     ScheduledTasksService
@@ -112,6 +113,7 @@ func NewClient(datacenter DataCenterRegion, username, password string) *Client {
 		UserAgent: userAgent}
 
 	client.DataCenters = &DataCentersServiceOp{client: client}
+	client.Hypervisors = &HypervisorsServiceOp{client: client}
 	client.CloudServers = &CloudServersServiceOp{client: client}
 	client.CloudServerActions = &CloudServerActionsServiceOp{client: client}
 	client.ScheduledTasks = &ScheduledTasksServiceOp{client: client}

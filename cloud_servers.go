@@ -2,7 +2,6 @@ package goarubacloud
 
 import "time"
 
-const hypervisorsPath = "GetHypervisors"
 const cloudSeverListPath = "GetServers"
 const cloudSeverDetailsPath = "GetServerDetails"
 const cloudSeverCreatePath = "SetEnqueueServerCreation"
@@ -15,7 +14,6 @@ type CloudServersService interface {
 	Get(int) (*CloudServerDetails, *Response, error)
 	Create(interface{}) (*CloudServer, *Response, error)
 	Delete(int) (*Response, error)
-	GetHypervisors() ([]Hypervisor, *Response, error)
 }
 
 // CloudServersServiceOp handles communication with the Cloud Server related methods of the
@@ -321,22 +319,6 @@ func (s *CloudServersServiceOp) Delete(serverId int) (*Response, error) {
 	}
 
 	return resp, err
-}
-
-func (s *CloudServersServiceOp) GetHypervisors() ([]Hypervisor, *Response, error) {
-
-	req, err := s.client.NewRequest(hypervisorsPath, nil)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	root := new(hypervisorsRoot)
-	resp, err := s.client.Do(req, root)
-	if err != nil {
-		return nil, resp, err
-	}
-
-	return root.Hypervisors, resp, err
 }
 
 const (
