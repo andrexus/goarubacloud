@@ -8,7 +8,7 @@ const removeScheduledOperationPath = "SetRemoveServerScheduledOperation"
 // ScheduledTasksService is an interface for interfacing with the cloud server actions
 // endpoints of the Arubacloud API
 type ScheduledTasksService interface {
-	List(*ScheduledTasksRequest) ([]ScheduledTask, *Response, error)
+	List(*Interval) ([]ScheduledTask, *Response, error)
 	Add() (*Response, error)
 	Update(int) (*Response, error)
 	Delete(int) (*Response, error)
@@ -72,11 +72,11 @@ func (m ScheduledTaskType) String() string {
 	return scheduled_task_types[m]
 }
 
-type ScheduledTasksRequest struct {
-	Period *Period `json:"GetScheduledOperations"`
+type scheduledTasksRoot struct {
+	ScheduledTasks []ScheduledTask `json:"Value"`
 }
 
-type Period struct {
+type Interval struct {
 	StartDate string
 	EndDate   string
 }
@@ -100,9 +100,20 @@ type ScheduledTaskIdCreate struct {
 	ScheduledOperationId int
 }
 
-func (s ScheduledTasksServiceOp) List(request *ScheduledTasksRequest) ([]ScheduledTask, *Response, error) {
-	// Not implemented yet
-	return nil, nil, nil
+func (s ScheduledTasksServiceOp) List(interval *Interval) ([]ScheduledTask, *Response, error) {
+	req, err := s.client.NewRequest(getScheduledOperationsPath, interval)
+
+	if err != nil {
+		return nil, nil, err
+	}
+
+	root := new(scheduledTasksRoot)
+	resp, err := s.client.Do(req, root)
+	if err != nil {
+		return nil, resp, err
+	}
+
+	return root.ScheduledTasks, resp, err
 }
 
 func (s ScheduledTasksServiceOp) Add() (*Response, error) {
@@ -118,19 +129,4 @@ func (s ScheduledTasksServiceOp) Update(scheduledOperationId int) (*Response, er
 func (s ScheduledTasksServiceOp) Delete(scheduledOperationId int) (*Response, error) {
 	// Not implemented yet
 	return nil, nil
-}
-
-func (s *ScheduledTasksServiceOp) doAction(scheduledOperationPath string, scheduledOperationRequest interface{}) (*Response, error) {
-	req, err := s.client.NewRequest(scheduledOperationPath, scheduledOperationRequest)
-
-	if err != nil {
-		return nil, err
-	}
-
-	resp, err := s.client.Do(req, nil)
-	if err != nil {
-		return resp, err
-	}
-
-	return resp, err
 }
