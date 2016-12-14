@@ -12,7 +12,7 @@ const cloudSeverDeletePath = "SetEnqueueServerDeletion"
 type CloudServersService interface {
 	List() ([]CloudServer, *Response, error)
 	Get(int) (*CloudServerDetails, *Response, error)
-	Create(interface{}) (*CloudServer, *Response, error)
+	Create(CloudServerCreator) (*CloudServer, *Response, error)
 	Delete(int) (*Response, error)
 }
 
@@ -195,25 +195,130 @@ type PublicIpAddress struct {
 	PublicIpAddressResourceId string
 }
 
-// CloudServerCreateRequestPro represents a request to create a CloudServer PRO.
-type CloudServerCreateRequestPro struct {
-	Name                         string                         `json:"Name"`
-	AdministratorPassword        string                         `json:"AdministratorPassword"`
-	OSTemplateId                 int                            `json:"OSTemplateId"`
-	Note                         string                         `json:"Note"`
-	CPUQuantity                  int                            `json:"CPUQuantity"`
-	RAMQuantity                  int                            `json:"RAMQuantity"`
-	VirtualDisks                 []CloudServerCreateVirtualDisk `json:"VirtualDisks"`
-	NetworkAdaptersConfiguration []NetworkAdapter               `json:"NetworkAdaptersConfiguration"`
+type CloudServerCreator interface {
+	GetServerName() string
+	GetRequest() interface{}
 }
 
-// CloudServerCreateRequestSmart represents a request to create a CloudServer SMART.
-type CloudServerCreateRequestSmart struct {
+type CloudServerProCreator interface {
+	AddVirtualDisk(int) error
+	SetCPUQuantity(int) error
+	SetRAMQuantity(int) error
+	SetNote(string) error
+	GetServerName() string
+	GetRequest() interface{}
+}
+
+func NewCloudServerProCreateRequest(name string, admin_password string, os_template_id int) CloudServerProCreator {
+	createRequest := &cloudServerCreateRequestPro{
+		Name:                         name,
+		OSTemplateId:                 os_template_id,
+		AdministratorPassword:        admin_password,
+		CPUQuantity:                  1,
+		RAMQuantity:                  1,
+		Note:                         "",
+		VirtualDisks:                 []CloudServerCreateVirtualDisk{},
+		NetworkAdaptersConfiguration: []NetworkAdapter{},
+	}
+	return createRequest
+}
+
+func NewCloudServerSmartCreateRequest(smart_server_type CloudServerSmartType, name string, admin_password string, os_template_id int) CloudServerCreator {
+	return &cloudServerCreateRequestSmart{
+		Name:         name,
+		OSTemplateId: os_template_id,
+		Note:         "",
+		AdministratorPassword: admin_password,
+		CloudServerSmartType:  smart_server_type,
+	}
+}
+
+// cloudServerCreateRequestPro represents a request to create a CloudServer PRO.
+type cloudServerCreateRequestPro struct {
+	Name                         string
+	AdministratorPassword        string
+	OSTemplateId                 int
+	Note                         string
+	CPUQuantity                  int
+	RAMQuantity                  int
+	VirtualDisks                 []CloudServerCreateVirtualDisk
+	NetworkAdaptersConfiguration []NetworkAdapter
+}
+
+func (r *cloudServerCreateRequestPro) AddVirtualDisk(size int) error {
+	if len(r.VirtualDisks) == 4 {
+		return NewArgError("operation", "max disk count is 4")
+	}
+	if size < 10 || size > 500 {
+		return NewArgError("size", "MaxSize per Disk: 500 GB. MinSize per Disk 10 GB")
+	}
+	if size%10 != 0 {
+		return NewArgError("size", "disk size must be a multiple of 10")
+
+	}
+	r.VirtualDisks = append(r.VirtualDisks, CloudServerCreateVirtualDisk{
+		VirtualDiskType: len(r.VirtualDisks),
+		Size:            size,
+	})
+	return nil
+}
+
+func (r *cloudServerCreateRequestPro) SetCPUQuantity(cpu_quantity int) error {
+	if cpu_quantity < 1 {
+		return NewArgError("cpu_quantity", "cpu_quantity must be > 1")
+	}
+
+	r.CPUQuantity = cpu_quantity
+	return nil
+}
+
+func (r *cloudServerCreateRequestPro) SetRAMQuantity(ram_quantity int) error {
+	if ram_quantity < 1 {
+		return NewArgError("ram_quantity", "ram_quantity must be > 1")
+	}
+
+	r.RAMQuantity = ram_quantity
+	return nil
+}
+
+func (r *cloudServerCreateRequestPro) SetNote(note string) error {
+	if len(note) > 4096 {
+		return NewArgError("note", "it is too long")
+	}
+	r.Note = note
+	return nil
+}
+
+func (r *cloudServerCreateRequestPro) GetServerName() string {
+	return r.Name
+}
+
+func (r *cloudServerCreateRequestPro) GetRequest() interface{} {
+	if len(r.VirtualDisks) == 0 {
+		r.VirtualDisks = append(r.VirtualDisks, CloudServerCreateVirtualDisk{
+			VirtualDiskType: 0,
+			Size:            10,
+		})
+	}
+
+	return r
+}
+
+// cloudServerCreateRequestSmart represents a request to create a CloudServer SMART.
+type cloudServerCreateRequestSmart struct {
 	Name                  string               `json:"Name"`
 	AdministratorPassword string               `json:"AdministratorPassword"`
 	OSTemplateId          int                  `json:"OSTemplateId"`
 	CloudServerSmartType  CloudServerSmartType `json:"SmartVMWarePackageID"`
 	Note                  string               `json:"Note"`
+}
+
+func (r *cloudServerCreateRequestSmart) GetServerName() string {
+	return r.Name
+}
+
+func (r *cloudServerCreateRequestSmart) GetRequest() interface{} {
+	return r
 }
 
 type hypervisorsRoot struct {
@@ -269,14 +374,18 @@ func (s *CloudServersServiceOp) Get(serverId int) (*CloudServerDetails, *Respons
 }
 
 // Create cloudServer
-func (s *CloudServersServiceOp) Create(createRequest interface{}) (*CloudServer, *Response, error) {
-	if createRequest == nil {
-		return nil, nil, NewArgError("createRequest", "cannot be nil")
+func (s *CloudServersServiceOp) Create(requestCreator CloudServerCreator) (*CloudServer, *Response, error) {
+	if requestCreator == nil {
+		return nil, nil, NewArgError("requestCreator", "cannot be nil")
+	}
+
+	if requestCreator.GetRequest() == nil {
+		return nil, nil, NewArgError("request", "cannot be nil")
 	}
 
 	data := struct {
 		Server interface{} `json:"Server"`
-	}{createRequest}
+	}{requestCreator.GetRequest()}
 
 	req, err := s.client.NewRequest(cloudSeverCreatePath, data)
 
@@ -290,7 +399,12 @@ func (s *CloudServersServiceOp) Create(createRequest interface{}) (*CloudServer,
 		return nil, resp, err
 	}
 
-	return root, resp, err
+	server, err := WaitForServerWithName(s.client, requestCreator.GetServerName())
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return server, resp, err
 }
 
 // Delete CloudServer
@@ -305,6 +419,11 @@ func (s *CloudServersServiceOp) Delete(serverId int) (*Response, error) {
 		if err != nil {
 			return resp, err
 		}
+	}
+
+	err = WaitForServerStatus(s.client, serverId, OFF)
+	if err != nil {
+		return nil, err
 	}
 
 	req, err := s.client.NewRequest(cloudSeverDeletePath, ServerIdCreate{ServerId: serverId})
@@ -322,13 +441,12 @@ func (s *CloudServersServiceOp) Delete(serverId int) (*Response, error) {
 }
 
 const (
-	// activeFailure is the amount of times we can fail before deciding
-	// the check for active is a total failure. This can help account
-	// for servers randomly not answering.
-	activeFailure = 4
+	// maxRetries is the amount of times we can fail before deciding
+	// the check is a total failure.
+	maxRetries = 10
 )
 
-// ServerStatus waits for a cloud servers status
+// WaitForServerStatus waits for a cloud servers status
 func WaitForServerStatus(client *Client, serverId int, status ServerStatus) error {
 	completed := false
 	failCount := 0
@@ -336,7 +454,7 @@ func WaitForServerStatus(client *Client, serverId int, status ServerStatus) erro
 		server_details, _, err := client.CloudServers.Get(serverId)
 
 		if err != nil {
-			if failCount <= activeFailure {
+			if failCount <= maxRetries {
 				failCount++
 				continue
 			}
@@ -351,4 +469,33 @@ func WaitForServerStatus(client *Client, serverId int, status ServerStatus) erro
 	}
 
 	return nil
+}
+
+// WaitForServerWithName waits for a server with specified name appears in the list
+func WaitForServerWithName(client *Client, serverName string) (*CloudServer, error) {
+	completed := false
+	failCount := 0
+	var server *CloudServer
+	for !completed {
+		servers, _, err := client.CloudServers.List()
+
+		if err != nil {
+			if failCount <= maxRetries {
+				failCount++
+				continue
+			}
+			return nil, err
+		}
+
+		for _, serverItem := range servers {
+			if serverItem.Name == serverName {
+				completed = true
+				server = &serverItem
+			}
+		}
+
+		time.Sleep(5 * time.Second)
+	}
+
+	return server, nil
 }

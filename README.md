@@ -35,40 +35,37 @@ client := goarubacloud.NewClient(goarubacloud.Germany, username, password)
 To create a new Cloud server **PRO**:
 
 ```go
-createRequest := &goarubacloud.CloudServerCreateRequestPro{
-		Name:         "yourServerName",
-		CPUQuantity:  1,
-		RAMQuantity:  4,
-		OSTemplateId: 481,
-		Note:         "created with goarubaclient",
-		AdministratorPassword:        "XXXXXXX",
-		NetworkAdaptersConfiguration: []goarubacloud.NetworkAdapter{},
+    server_name := "myServerNamePro"
+	os_template_id := 481
+	admin_password := "myPassword"
+
+	createRequest := goarubacloud.NewCloudServerProCreateRequest(server_name, admin_password, os_template_id)
+	err := createRequest.AddVirtualDisk(20)
+	if err != nil{
+		log.Println("[ERROR]", err)
 	}
-	createRequest.VirtualDisks = append(createRequest.VirtualDisks, goarubacloud.CloudServerCreateVirtualDisk{
-		VirtualDiskType: 0,
-		Size:            10,
-	})
+	
+	createRequest.SetCPUQuantity(2)
+	createRequest.SetRAMQuantity(4)
+	createRequest.SetNote("created by goarubacloud")
 
 	cloudServer, resp, err := client.CloudServers.Create(createRequest)
 	if err != nil {
-		fmt.Printf("Something bad happened: %s\n\n", err)
+		fmt.Println("Something bad happened:", err)
 	}
 ```
 
 To create a new Cloud server **SMART**:
 
 ```go
-createRequest := &goarubacloud.CloudServerCreateRequestSmart{
-		Name:         "yourServerName",
-		OSTemplateId: 482,
-		Note:         "created with goarubaclient",
-		AdministratorPassword: "XXXXXXX",
-		CloudServerSmartType:  goarubacloud.MEDIUM,
-	}
-
+    server_name := "myServerNameSmart"
+	os_template_id := 482
+	admin_password := "myPassword"
+	createRequest := goarubacloud.NewCloudServerSmartCreateRequest(goarubacloud.MEDIUM, server_name, admin_password, os_template_id)
+	
 	cloudServer, resp, err := client.CloudServers.Create(createRequest)
 	if err != nil {
-		fmt.Printf("Something bad happened: %s\n\n", err)
+		fmt.Println("Something bad happened:", err)
 	}
 ```
 

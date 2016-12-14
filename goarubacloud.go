@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	libraryVersion    = "0.2.0"
+	libraryVersion    = "0.3.0"
 	apiServerEnvName  = "ARUBACLOUD_APISERVER"
 	logLevelEnvName   = "ARUBACLOUD_LOG"
 	apiServerBasePath = "/WsEndUser/v2.9/WsEndUser.svc/json"
