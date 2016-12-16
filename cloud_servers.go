@@ -1,6 +1,9 @@
 package goarubacloud
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 const cloudSeverListPath = "GetServers"
 const cloudSeverDetailsPath = "GetServerDetails"
@@ -192,7 +195,7 @@ type IpAddress struct {
 
 type PublicIpAddress struct {
 	PrimaryIPAddress          string
-	PublicIpAddressResourceId string
+	PublicIpAddressResourceId int
 }
 
 type CloudServerCreator interface {
@@ -202,6 +205,7 @@ type CloudServerCreator interface {
 
 type CloudServerProCreator interface {
 	AddVirtualDisk(int) error
+	AddPublicIp(int) error
 	SetCPUQuantity(int) error
 	SetRAMQuantity(int) error
 	SetNote(string) error
@@ -218,7 +222,7 @@ func NewCloudServerProCreateRequest(name string, admin_password string, os_templ
 		RAMQuantity:                  1,
 		Note:                         "",
 		VirtualDisks:                 []CloudServerCreateVirtualDisk{},
-		NetworkAdaptersConfiguration: []NetworkAdapter{},
+		NetworkAdaptersConfiguration: []NetworkAdapterCreateConfiguration{},
 	}
 	return createRequest
 }
@@ -242,7 +246,7 @@ type cloudServerCreateRequestPro struct {
 	CPUQuantity                  int
 	RAMQuantity                  int
 	VirtualDisks                 []CloudServerCreateVirtualDisk
-	NetworkAdaptersConfiguration []NetworkAdapter
+	NetworkAdaptersConfiguration []NetworkAdapterCreateConfiguration
 }
 
 func (r *cloudServerCreateRequestPro) AddVirtualDisk(size int) error {
@@ -263,9 +267,23 @@ func (r *cloudServerCreateRequestPro) AddVirtualDisk(size int) error {
 	return nil
 }
 
+func (r *cloudServerCreateRequestPro) AddPublicIp(resourceId int) error {
+	if resourceId == 0 {
+		return NewArgError("resourceId", "it must be > 0")
+	}
+	publicIpAddress := PublicIpAddress{PrimaryIPAddress: "true", PublicIpAddressResourceId: resourceId}
+
+	r.NetworkAdaptersConfiguration = append(r.NetworkAdaptersConfiguration, NetworkAdapterCreateConfiguration{
+		NetworkAdapterType: len(r.NetworkAdaptersConfiguration),
+		PublicIpAddresses:  []PublicIpAddress{publicIpAddress},
+	})
+
+	return nil
+}
+
 func (r *cloudServerCreateRequestPro) SetCPUQuantity(cpu_quantity int) error {
 	if cpu_quantity < 1 {
-		return NewArgError("cpu_quantity", "cpu_quantity must be > 1")
+		return NewArgError("cpu_quantity", "it must be > 1")
 	}
 
 	r.CPUQuantity = cpu_quantity
@@ -274,7 +292,7 @@ func (r *cloudServerCreateRequestPro) SetCPUQuantity(cpu_quantity int) error {
 
 func (r *cloudServerCreateRequestPro) SetRAMQuantity(ram_quantity int) error {
 	if ram_quantity < 1 {
-		return NewArgError("ram_quantity", "ram_quantity must be > 1")
+		return NewArgError("ram_quantity", "it must be > 1")
 	}
 
 	r.RAMQuantity = ram_quantity
@@ -337,6 +355,24 @@ type cloudServersRoot struct {
 type CloudServerCreateVirtualDisk struct {
 	VirtualDiskType int
 	Size            int
+}
+
+type NetworkAdapterCreateConfiguration struct {
+	NetworkAdapterType int
+	PublicIpAddresses  []PublicIpAddress
+}
+
+func (s *CloudServerDetails) GetPublicIpAddress() (string, error) {
+	if s.EasyCloudPackageID != 0 {
+		return s.EasyCloudIPAddress.Value, nil
+	} else {
+		for _, network_adapter := range s.NetworkAdapters {
+			for _, public_ip := range network_adapter.IPAddresses {
+				return public_ip.Value, nil
+			}
+		}
+		return "", fmt.Errorf("Server %d doesn't have any public IPs assigned to it", s.ServerId)
+	}
 }
 
 // List all CloudServers

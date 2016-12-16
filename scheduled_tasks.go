@@ -1,5 +1,10 @@
 package goarubacloud
 
+import (
+	"fmt"
+	"time"
+)
+
 const getScheduledOperationsPath = "GetScheduledOperations"
 const addScheduledOperationPath = "SetAddServerScheduledOperation"
 const updateScheduledOperationPath = "SetUpdateServerScheduledOperation"
@@ -77,8 +82,8 @@ type scheduledTasksRoot struct {
 }
 
 type Interval struct {
-	StartDate string
-	EndDate   string
+	StartDate time.Time
+	EndDate   time.Time
 }
 
 type ScheduledTaskCreateRequest struct {
@@ -101,7 +106,15 @@ type ScheduledTaskIdCreate struct {
 }
 
 func (s ScheduledTasksServiceOp) List(interval *Interval) ([]ScheduledTask, *Response, error) {
-	req, err := s.client.NewRequest(getScheduledOperationsPath, interval)
+	data := struct {
+		StartDate string
+		EndDate   string
+	}{
+		StartDate: fmt.Sprintf("/Date(%d)/", interval.StartDate.Unix()),
+		EndDate:   fmt.Sprintf("/Date(%d)/", interval.EndDate.Unix()),
+	}
+
+	req, err := s.client.NewRequest(getScheduledOperationsPath, data)
 
 	if err != nil {
 		return nil, nil, err

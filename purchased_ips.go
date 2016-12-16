@@ -7,7 +7,7 @@ const removeIpPath = "SetRemoveIpAddress"
 type PurchasedIPsService interface {
 	List() ([]PurchasedIP, *Response, error)
 	Purchase() (*PurchasedIP, *Response, error)
-	Delete(*PurchasedIP) (*Response, error)
+	Delete(int) (*Response, error)
 }
 
 // PurchasedIPsServiceOp handles communication with the purchased IPs related methods of the
@@ -35,6 +35,10 @@ type PurchasedIP struct {
 	ResourceId       int
 	ResourceType     int
 	LoadBalancerID   interface{}
+}
+
+type purchasedIpRoot struct {
+	PurchasedIP *PurchasedIP `json:"Value"`
 }
 
 type purchasedIpsRoot struct {
@@ -70,19 +74,19 @@ func (s *PurchasedIPsServiceOp) Purchase() (*PurchasedIP, *Response, error) {
 		return nil, nil, err
 	}
 
-	root := new(PurchasedIP)
+	root := new(purchasedIpRoot)
 	resp, err := s.client.Do(req, root)
 	if err != nil {
 		return nil, resp, err
 	}
 
-	return root, resp, nil
+	return root.PurchasedIP, resp, nil
 }
 
 // Delete purchased IP.
-func (s *PurchasedIPsServiceOp) Delete(purchasedIp *PurchasedIP) (*Response, error) {
+func (s *PurchasedIPsServiceOp) Delete(IpAddressResourceId int) (*Response, error) {
 	req, err := s.client.NewRequest(removeIpPath,
-		PurchasedIpRemoveRequest{IpAddressResourceId:purchasedIp.ResourceId})
+		PurchasedIpRemoveRequest{IpAddressResourceId:IpAddressResourceId})
 
 	if err != nil {
 		return nil, err
