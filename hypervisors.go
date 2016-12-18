@@ -63,7 +63,7 @@ func (s *HypervisorsServiceOp)FindOsTemplate(hypervisorType HypervisorType, name
 			return &template, nil
 		}
 	}
-	return nil, fmt.Errorf("Template not found for %s", name)
+	return nil, fmt.Errorf("Hypervisor '%s' doesn't support template with name '%s'",hypervisorType, name)
 }
 
 type HypervisorType int

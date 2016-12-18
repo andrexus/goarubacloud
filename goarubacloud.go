@@ -11,11 +11,14 @@ import (
 	"net/url"
 	"os"
 
+	"errors"
+	"strings"
+
 	"github.com/hashicorp/logutils"
 )
 
 const (
-	libraryVersion    = "0.3.1"
+	libraryVersion    = "0.4.0"
 	apiServerEnvName  = "ARUBACLOUD_APISERVER"
 	logLevelEnvName   = "ARUBACLOUD_LOG"
 	apiServerBasePath = "/WsEndUser/v2.9/WsEndUser.svc/json"
@@ -65,7 +68,7 @@ type Client struct {
 	ScheduledTasks     ScheduledTasksService
 	Snapshots          SnapshotsService
 	PurchasedIPs       PurchasedIPsService
-	VLans              VLANsService
+	VLANs              VLANsService
 
 	// Optional function called after every successful request made to the Arubacloud API
 	onRequestCompleted RequestCompletionCallback
@@ -119,7 +122,7 @@ func NewClient(datacenter DataCenterRegion, username, password string) *Client {
 	client.ScheduledTasks = &ScheduledTasksServiceOp{client: client}
 	client.Snapshots = &SnapshotsServiceOp{client: client}
 	client.PurchasedIPs = &PurchasedIPsServiceOp{client: client}
-	client.VLans = &VLANsServiceOp{client: client}
+	client.VLANs = &VLANsServiceOp{client: client}
 
 	return client
 }
@@ -254,7 +257,9 @@ func CheckResponse(r *http.Response, data []byte) error {
 		}
 	}
 	if errorResponse.Success == false {
-		return errorResponse
+		message := errorResponse.Message
+		trimPosition := strings.Index(message, "\r")
+		return errors.New(message[0:trimPosition])
 	}
 
 	return nil

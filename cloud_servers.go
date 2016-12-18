@@ -2,6 +2,8 @@ package goarubacloud
 
 import (
 	"fmt"
+	"log"
+	"strings"
 	"time"
 )
 
@@ -156,14 +158,29 @@ func (m ServerStatus) String() string {
 	return server_status[m-1]
 }
 
-type CloudServerSmartType int
+type CloudServerSmartSize int
 
 const (
-	SMALL CloudServerSmartType = 1 + iota
+	SMALL CloudServerSmartSize = 1 + iota
 	MEDIUM
 	LARGE
 	EXTRALARGE
 )
+
+func GetServerSmartSize(size string) (CloudServerSmartSize, error) {
+	switch strings.ToUpper(size) {
+	case "SMALL":
+		return SMALL, nil
+	case "MEDIUM":
+		return MEDIUM, nil
+	case "LARGE":
+		return LARGE, nil
+	case "EXTRALARGE":
+		return EXTRALARGE, nil
+	default:
+		return 0, fmt.Errorf("size '%s' is wrong. Supported values are: 'SMALL', 'MEDIUM','LARGE','EXTRALARGE'", size)
+	}
+}
 
 type NetworkAdapter struct {
 	Id                 int
@@ -201,6 +218,7 @@ type PublicIpAddress struct {
 type CloudServerCreator interface {
 	GetServerName() string
 	GetRequest() interface{}
+	SetNote(string) error
 }
 
 type CloudServerProCreator interface {
@@ -227,13 +245,13 @@ func NewCloudServerProCreateRequest(name string, admin_password string, os_templ
 	return createRequest
 }
 
-func NewCloudServerSmartCreateRequest(smart_server_type CloudServerSmartType, name string, admin_password string, os_template_id int) CloudServerCreator {
+func NewCloudServerSmartCreateRequest(smart_server_size CloudServerSmartSize, name string, admin_password string, os_template_id int) CloudServerCreator {
 	return &cloudServerCreateRequestSmart{
 		Name:         name,
 		OSTemplateId: os_template_id,
 		Note:         "",
 		AdministratorPassword: admin_password,
-		CloudServerSmartType:  smart_server_type,
+		CloudServerSmartType:  smart_server_size,
 	}
 }
 
@@ -327,7 +345,7 @@ type cloudServerCreateRequestSmart struct {
 	Name                  string               `json:"Name"`
 	AdministratorPassword string               `json:"AdministratorPassword"`
 	OSTemplateId          int                  `json:"OSTemplateId"`
-	CloudServerSmartType  CloudServerSmartType `json:"SmartVMWarePackageID"`
+	CloudServerSmartType  CloudServerSmartSize `json:"SmartVMWarePackageID"`
 	Note                  string               `json:"Note"`
 }
 
@@ -337,6 +355,14 @@ func (r *cloudServerCreateRequestSmart) GetServerName() string {
 
 func (r *cloudServerCreateRequestSmart) GetRequest() interface{} {
 	return r
+}
+
+func (r *cloudServerCreateRequestSmart) SetNote(note string) error {
+	if len(note) > 4096 {
+		return NewArgError("note", "it is too long")
+	}
+	r.Note = note
+	return nil
 }
 
 type hypervisorsRoot struct {
@@ -534,4 +560,35 @@ func WaitForServerWithName(client *Client, serverName string) (*CloudServer, err
 	}
 
 	return server, nil
+}
+
+func WaitForServerCreationDone(client *Client, serverId int) error {
+	completed := false
+	for !completed {
+		all_jobs, _, err := client.DataCenters.GetJobs()
+		if err != nil {
+			return err
+		}
+
+		server_jobs := make([]ActiveJob, len(all_jobs))
+		for _, job := range all_jobs {
+			if job.ServerId == serverId {
+				server_jobs = append(server_jobs, job)
+			}
+		}
+
+		if len(server_jobs) == 0 {
+			log.Printf("[INFO] No active jobs for server %d", serverId)
+			completed = true
+		}
+
+		for _, job := range server_jobs {
+			log.Printf("[INFO] Server ID: %d. Operation: %s. Progress: %d%%\n",
+				job.ServerId, job.OperationName, job.Progress)
+		}
+
+		time.Sleep(15 * time.Second)
+	}
+
+	return nil
 }

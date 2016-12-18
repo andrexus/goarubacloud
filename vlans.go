@@ -10,10 +10,10 @@ const vLANDetachPath = "SetEnqueueDeassociateVLan"
 // endpoint of the Arubacloud API
 type VLANsService interface {
 	List() ([]PurchasedVLAN, *Response, error)
-	Purchase(VLanName string) (*PurchasedVLAN, *Response, error)
-	Delete(VLan *PurchasedVLAN) (*Response, error)
-	Attach(attachRequest *PurchasedVLanAttachRequest) (*PurchasedVLAN, *Response, error)
-	Detach(attachRequest *PurchasedVLanAttachRequest) (*Response, error)
+	Purchase(name string) (*PurchasedVLAN, *Response, error)
+	Delete(vlan_resource_id int) (*Response, error)
+	Attach(attachRequest *purchasedVLANAttachRequest) (*PurchasedVLAN, *Response, error)
+	Detach(network_adapter_id int, vlan_resource_id int) (*Response, error)
 }
 
 // VLANsServiceOp handles communication with the purchased VLANs related methods of the
@@ -35,14 +35,7 @@ type PurchasedVLAN struct {
 	UserId       int
 }
 
-type PurchasedVLanCreateRequest struct {
-	VLanName string
-}
-type PurchasedVLanDeleteRequest struct {
-	VLanResourceId int
-}
-
-type PurchasedVLanAttachRequest struct {
+type purchasedVLANAttachRequest struct {
 	NetworkAdapterId int
 	VLanResourceId   int
 	Gateway          string
@@ -50,24 +43,35 @@ type PurchasedVLanAttachRequest struct {
 	SubnetMask       string
 }
 
-type PrivateIp struct {
+type privateIP struct {
 	Gateway    string `json:"GateWay"`
 	IP         string
 	SubNetMask string
 }
 
+type purchasedVLANRoot struct {
+	PurchasedVLAN *PurchasedVLAN `json:"Value"`
+}
+
 type purchasedVLANsRoot struct {
-	PurchasedVLans []PurchasedVLAN `json:"Value"`
+	PurchasedVLANs []PurchasedVLAN `json:"Value"`
 }
 
 type vLANRequestRoot struct {
 	NetworkAdapterId    int
 	VLanResourceId      int
 	SetOnVirtualMachine bool
-	PrivateIps          []PrivateIp `json:"PrivateIps,omitempty"`
+	PrivateIps          []privateIP `json:"PrivateIps,omitempty"`
 }
 
-// List all purchased VLans.
+func NewPurchasedVLanAttachRequest(network_adapter_id int, vlan_resource_id int) *purchasedVLANAttachRequest {
+	return &purchasedVLANAttachRequest{
+		NetworkAdapterId: network_adapter_id,
+		VLanResourceId:   vlan_resource_id,
+	}
+}
+
+// List all purchased VLANs.
 func (s *VLANsServiceOp) List() ([]PurchasedVLAN, *Response, error) {
 	req, err := s.client.NewRequest(vLANsListPath, nil)
 
@@ -81,27 +85,29 @@ func (s *VLANsServiceOp) List() ([]PurchasedVLAN, *Response, error) {
 		return nil, resp, err
 	}
 
-	return root.PurchasedVLans, resp, nil
+	return root.PurchasedVLANs, resp, nil
 }
 
-func (s *VLANsServiceOp) Purchase(VLanName string) (*PurchasedVLAN, *Response, error) {
-	req, err := s.client.NewRequest(vLANPurchasePath, PurchasedVLanCreateRequest{VLanName: VLanName})
+func (s *VLANsServiceOp) Purchase(name string) (*PurchasedVLAN, *Response, error) {
+	body := struct{ VLanName string }{VLanName: name}
+	req, err := s.client.NewRequest(vLANPurchasePath, body)
 
 	if err != nil {
 		return nil, nil, err
 	}
 
-	root := new(PurchasedVLAN)
+	root := new(purchasedVLANRoot)
 	resp, err := s.client.Do(req, root)
 	if err != nil {
 		return nil, resp, err
 	}
 
-	return root, resp, nil
+	return root.PurchasedVLAN, resp, nil
 }
 
-func (s *VLANsServiceOp) Delete(VLan *PurchasedVLAN) (*Response, error) {
-	req, err := s.client.NewRequest(vLANRemovePath, PurchasedVLanDeleteRequest{VLanResourceId: VLan.ResourceId})
+func (s *VLANsServiceOp) Delete(vlan_resource_id int) (*Response, error) {
+	body := struct{ VLanResourceId int }{VLanResourceId: vlan_resource_id}
+	req, err := s.client.NewRequest(vLANRemovePath, body)
 
 	if err != nil {
 		return nil, err
@@ -115,7 +121,7 @@ func (s *VLANsServiceOp) Delete(VLan *PurchasedVLAN) (*Response, error) {
 	return resp, nil
 }
 
-func (s *VLANsServiceOp) Attach(attachRequest *PurchasedVLanAttachRequest) (*PurchasedVLAN, *Response, error) {
+func (s *VLANsServiceOp) Attach(attachRequest *purchasedVLANAttachRequest) (*PurchasedVLAN, *Response, error) {
 	if attachRequest == nil {
 		return nil, nil, NewArgError("attachRequest", "cannot be nil")
 	}
@@ -124,22 +130,22 @@ func (s *VLANsServiceOp) Attach(attachRequest *PurchasedVLanAttachRequest) (*Pur
 		NetworkAdapterId:    attachRequest.NetworkAdapterId,
 		VLanResourceId:      attachRequest.VLanResourceId,
 		SetOnVirtualMachine: false,
-		PrivateIps:          []PrivateIp{},
+		PrivateIps:          []privateIP{},
 	}
 	if attachRequest.Gateway != "" {
 		vLANRequestRoot.SetOnVirtualMachine = true
-		vLANRequestRoot.PrivateIps = append(vLANRequestRoot.PrivateIps, PrivateIp{
+		vLANRequestRoot.PrivateIps = append(vLANRequestRoot.PrivateIps, privateIP{
 			Gateway:    attachRequest.Gateway,
 			IP:         attachRequest.IP,
 			SubNetMask: attachRequest.SubnetMask,
 		})
 	}
 
-	data := struct {
+	body := struct {
 		VLanRequest interface{}
 	}{vLANRequestRoot}
 
-	req, err := s.client.NewRequest(vLANAttachPath, data)
+	req, err := s.client.NewRequest(vLANAttachPath, body)
 
 	if err != nil {
 		return nil, nil, err
@@ -154,22 +160,26 @@ func (s *VLANsServiceOp) Attach(attachRequest *PurchasedVLanAttachRequest) (*Pur
 	return root, resp, err
 }
 
-func (s *VLANsServiceOp) Detach(attachRequest *PurchasedVLanAttachRequest) (*Response, error) {
-	if attachRequest == nil {
-		return nil, NewArgError("attachRequest", "cannot be nil")
+func (s *VLANsServiceOp) Detach(network_adapter_id int, vlan_resource_id int) (*Response, error) {
+	if network_adapter_id == 0 {
+		return nil, NewArgError("network_adapter_id", "cannot be nil")
+	}
+
+	if vlan_resource_id == 0 {
+		return nil, NewArgError("vlan_resource_id", "cannot be nil")
 	}
 
 	vLANRequestRoot := vLANRequestRoot{
-		NetworkAdapterId:    attachRequest.NetworkAdapterId,
-		VLanResourceId:      attachRequest.VLanResourceId,
+		NetworkAdapterId:    network_adapter_id,
+		VLanResourceId:      vlan_resource_id,
 		SetOnVirtualMachine: false,
 	}
 
-	data := struct {
+	body := struct {
 		VLanRequest interface{}
 	}{vLANRequestRoot}
 
-	req, err := s.client.NewRequest(vLANDetachPath, data)
+	req, err := s.client.NewRequest(vLANDetachPath, body)
 
 	if err != nil {
 		return nil, err
