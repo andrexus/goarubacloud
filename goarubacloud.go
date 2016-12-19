@@ -11,7 +11,6 @@ import (
 	"net/url"
 	"os"
 
-	"errors"
 	"strings"
 
 	"github.com/hashicorp/logutils"
@@ -241,8 +240,7 @@ func (c *Client) Do(req *http.Request, v interface{}) (*Response, error) {
 }
 
 func (r *ErrorResponse) Error() string {
-	return fmt.Sprintf("%v %v: %d %v",
-		r.Response.Request.Method, r.Response.Request.URL, r.Response.StatusCode, r.Message)
+	return fmt.Sprintf("%s. Result code: %d", r.Message, r.ResultCode)
 }
 
 // CheckResponse checks the API response for errors, and returns them if present. A response is considered an
@@ -259,7 +257,8 @@ func CheckResponse(r *http.Response, data []byte) error {
 	if errorResponse.Success == false {
 		message := errorResponse.Message
 		trimPosition := strings.Index(message, "\r")
-		return errors.New(message[0:trimPosition])
+		errorResponse.Message = message[0:trimPosition]
+		return errorResponse
 	}
 
 	return nil
